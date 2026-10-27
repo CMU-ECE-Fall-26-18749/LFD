@@ -47,8 +47,9 @@ class LocalFaultDetector:
                         self.set_status(True, reply.get("boot_id"))
                         await asyncio.sleep(args.heartbeat_freq)
             except (OSError, TimeoutError, WebSocketException, ValueError) as exc:
-                log(f"{args.lfd_id}: [{count}] FAULT DETECTED - {args.replica_id}: "
-                    f"{type(exc).__name__}", "fault")
+                if self.alive:
+                    log(f"{args.lfd_id}: [{count}] FAULT DETECTED - "
+                        f"{args.replica_id}: {type(exc).__name__}", "fault")
                 self.set_status(False)
                 await asyncio.sleep(args.heartbeat_freq)
 
@@ -118,7 +119,7 @@ def parse_args():
     parser.add_argument("--heartbeat_freq", type=float, required=True,
                         help="Heartbeat INTERVAL in seconds (retained Milestone 1 flag name)")
     parser.add_argument("--timeout", type=float, default=3)
-    parser.add_argument("--gfd_url", help="Enable Milestone 2 reporting, e.g. ws://192.168.1.10:9000")
+    parser.add_argument("--gfd_url", help="Milestone 3 GFD, e.g. ws://192.168.1.10:9000")
     parser.add_argument("--advertise_url", help="Replica URL reachable from the CLIENT machine")
     args = parser.parse_args()
     if args.heartbeat_freq <= 0 or args.timeout <= 0:

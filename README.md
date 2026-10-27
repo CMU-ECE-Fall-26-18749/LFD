@@ -1,20 +1,10 @@
-# 18-749 local fault detector
+# Milestone 3 Local Fault Detector
 
-Run one LFD on each replica's physical machine. It heartbeats the local replica,
-registers with the GFD, answers the GFD's heartbeats, and reports membership changes.
+Each replica laptop runs one LFD beside its replica:
 
-Keep `LFD`, `server`, and `client` as sibling folders. From their parent:
+- LFD1 monitors primary S1.
+- LFD2 monitors backup S2.
+- LFD3 monitors backup S3.
 
-```text
-python server/demo.py setup
-python server/demo.py lfd1 --gfd-host COORDINATOR_IP --replica-host THIS_LAPTOP_IP
-```
-
-Use `lfd2` or `lfd3` for the other replicas. The local server connection uses
-localhost, but the advertised URL must use an IP reachable from the client laptop.
-`--heartbeat 1` means a one-second interval; `--timeout 3` means a three-second timeout.
-
-The original `lfd.py` flags remain available. Omit `--gfd_url` for Milestone 1 local
-monitoring. See the sibling server README for startup order, full commands, tests,
-design, and rollback. Do not restart a crashed replica during Milestone 2 traffic:
-its new boot ID is excluded until a full clean demo restart.
+Use the launcher in the sibling server folder. The complete machine assignments,
+startup order, and terminal commands are in [`../server/README.md`](../server/README.md).
