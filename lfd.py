@@ -16,11 +16,17 @@ class LocalFaultDetector:
         self.args = args
         self.alive = False
         self.boot_id = None
+        self.last_boot_id = None
         self.changed = asyncio.Event()
 
     def set_status(self, alive, boot_id=None):
         if (alive, boot_id) != (self.alive, self.boot_id):
             self.alive, self.boot_id = alive, boot_id
+            if alive and boot_id:
+                if self.last_boot_id and self.last_boot_id != boot_id:
+                    log(f"{self.args.lfd_id}: Detected restart of "
+                        f"{self.args.replica_id}: boot_id={boot_id}", "membership")
+                self.last_boot_id = boot_id
             self.changed.set()
             log(f"{self.args.lfd_id}: {'add' if alive else 'delete'} replica "
                 f"{self.args.replica_id}", "membership")
@@ -40,11 +46,14 @@ class LocalFaultDetector:
                             "lfd_id": args.lfd_id, "replica_id": args.replica_id,
                             "heartbeat_count": count})), args.timeout)
                         reply = json.loads(await asyncio.wait_for(ws.recv(), args.timeout))
+                        boot_id = reply.get("boot_id")
                         if (reply.get("replica_id") != args.replica_id or
                                 reply.get("heartbeat_count") != count or reply.get("status") != "alive"):
                             raise ValueError("heartbeat identity/count mismatch")
+                        if args.gfd_url and (not isinstance(boot_id, str) or not boot_id):
+                            raise ValueError("missing replica boot ID")
                         log(f"{args.lfd_id}: [{count}] Received heartbeat from {args.replica_id}", "heartbeat")
-                        self.set_status(True, reply.get("boot_id"))
+                        self.set_status(True, boot_id)
                         await asyncio.sleep(args.heartbeat_freq)
             except (OSError, TimeoutError, WebSocketException, ValueError) as exc:
                 if self.alive:
@@ -76,9 +85,10 @@ class LocalFaultDetector:
                         while True:
                             await self.changed.wait()
                             self.changed.clear()
-                            await send({"type": "status", "alive": self.alive,
-                                        "boot_id": self.boot_id})
-                            log(f"{args.lfd_id}: Sent {'add' if self.alive else 'delete'} "
+                            alive, boot_id = self.alive, self.boot_id
+                            await send({"type": "status", "alive": alive,
+                                        "boot_id": boot_id})
+                            log(f"{args.lfd_id}: Sent {'add' if alive else 'delete'} "
                                 f"replica {args.replica_id} to GFD", "membership")
 
                     async def receive():
@@ -119,7 +129,7 @@ def parse_args():
     parser.add_argument("--heartbeat_freq", type=float, required=True,
                         help="Heartbeat INTERVAL in seconds (retained Milestone 1 flag name)")
     parser.add_argument("--timeout", type=float, default=3)
-    parser.add_argument("--gfd_url", help="Milestone 3 GFD, e.g. ws://192.168.1.10:9000")
+    parser.add_argument("--gfd_url", help="GFD WebSocket URL, e.g. ws://192.168.1.10:9000")
     parser.add_argument("--advertise_url", help="Replica URL reachable from the CLIENT machine")
     args = parser.parse_args()
     if args.heartbeat_freq <= 0 or args.timeout <= 0:
